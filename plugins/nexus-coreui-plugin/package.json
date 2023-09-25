@@ -38,7 +38,7 @@
     "@babel/plugin-transform-runtime": "7.17.0",
     "@babel/preset-env": "7.16.11",
     "@babel/preset-react": "7.16.7",
-    "@sonatype/nexus-ui-plugin": "workspace:*",
+    "@sonatype/nexus-ui-plugin": "file:../../components/nexus-ui-plugin",
     "@testing-library/jest-dom": "5.14.1",
     "@testing-library/react": "12.1.2",
     "@testing-library/user-event": "12.8.3",
