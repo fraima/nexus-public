@@ -13,9 +13,9 @@ jdk==1.8
 ```bash
 mkdir -p /tmp/sonatype-work/nexus3/etc/
 
-export PG_URL="10.10.0.11:5432"
-export PG_USER="treska"
-export PG_PASSWORD="treska"
+export PG_URL="localhost:5432"
+export PG_USER="nexus"
+export PG_PASSWORD="nexus"
 export PG_DB="nexus"
 
 cat <<EOF > /tmp/sonatype-work/nexus3/etc/nexus.properties
