@@ -13,9 +13,9 @@ jdk==1.8
 ```bash
 mkdir -p /tmp/sonatype-work/nexus3/etc/
 
-export PG_URL="localhost:5432"
-export PG_USER="nexus"
-export PG_PASSWORD="nexus"
+export PG_URL="10.10.0.11:5432"
+export PG_USER="treska"
+export PG_PASSWORD="treska"
 export PG_DB="nexus"
 
 cat <<EOF > /tmp/sonatype-work/nexus3/etc/nexus.properties
@@ -27,9 +27,10 @@ EOF
 docker build .
 
 docker run -d -ti     \
+    --rm \
     -p 8080:8081 \
     -v /tmp/sonatype-work/nexus3/etc/nexus.properties:/sonatype-work/nexus3/etc/nexus.properties \
-    $DOCKER_IMAGE sh
+    fraima.io/nexus:3.58.1-02
 
 ```
 
@@ -67,3 +68,8 @@ java -jar nexus-db-migrator-*.jar --migration_type=postgres_to_h2 --db_url="jdbc
 nexus-db-migrator не поддерживает прямую миграцию PG->PG 
 для реализации такого сценария сначала нужно выполнить миграцию PG->H2 затем H2->PG
 
+
+https://github.com/sonatype/docker-nexus/issues/9
+
+export NEXUS_VERSION=3.60.0-02
+https://repo1.maven.org/maven2/org/sonatype/nexus/plugins/nexus-p2-bridge-plugin/${NEXUS_VERSION}/nexus-p2-bridge-plugin-${NEXUS_VERSION}-bundle.zip

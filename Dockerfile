@@ -22,7 +22,7 @@ COPY --from=builder --chown=app:app /build/nexus-base-template-*/ /app/
 COPY --from=builder --chown=app:app /build/sonatype-work/ /sonatype-work/
 RUN mkdir -p /app/system/com/sonatype/nexus/plugins/
 
-COPY --from=src-plugin --chown=app:app /opt/sonatype/nexus/system/com/sonatype/nexus/plugins/*/* /app/system/org/sonatype/nexus/plugins/
+COPY --from=src-plugin --chown=app:app /opt/sonatype/nexus/system/com/sonatype/nexus/plugins/*/* /app/system/com/sonatype/nexus/plugins/
 COPY --from=src-plugin --chown=app:app /opt/sonatype/nexus/system/com/sonatype/nexus/assemblies/nexus-pro-feature/3.58.1-02/nexus-pro-feature-3.58.1-02-features.xml /app/system/com/sonatype/nexus/assemblies/nexus-pro-feature/3.58.1-02/nexus-pro-feature-3.58.1-02-features.xml
 
 CMD ["./bin/nexus"]
