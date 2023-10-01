@@ -12,6 +12,8 @@ jdk==1.8
 
 ```bash
 mkdir -p /tmp/sonatype-work/nexus3/etc/
+mkdir -p /tmp/nexus-data
+chmod 777 /tmp/nexus-data
 
 export PG_URL="localhost:5432"
 export PG_USER="nexus"
@@ -24,12 +26,12 @@ nexus.datastore.nexus.jdbcUrl=jdbc:postgresql://$PG_URL/$PG_DB?user=$PG_USER&pas
 nexus.datastore.nexus.genericJdbc=true
 EOF
 
-docker build .
-
+docker build -t fraima.io/nexus:3.58.1-02 . 
 docker run -d -ti     \
     --rm \
     -p 8080:8081 \
-    -v /tmp/sonatype-work/nexus3/etc/nexus.properties:/sonatype-work/nexus3/etc/nexus.properties \
+    -v /tmp/sonatype-work/nexus3/etc/nexus.properties:/opt/sonatype/sonatype-work/nexus3/etc/nexus.properties \
+    -v /tmp/nexus-data:/nexus-data \
     fraima.io/nexus:3.58.1-02
 
 ```
