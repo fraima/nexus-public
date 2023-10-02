@@ -26,6 +26,8 @@ public interface FeatureFlags
   /* Database externalization. Available values: true, false. Default value: false */
   String DATASTORE_ENABLED = "nexus.datastore.enabled";
   String DATASTORE_ENABLED_NAMED = "${nexus.datastore.enabled:-false}";
+  String DATASTORE_GENERIC_JDBC_ENABLED_NAMED = "${nexus.datastore.nexus.genericJdbc:-false}";
+
 
   /* Database externalization developers only. Available values: true, false. Default value: false */
   String DATASTORE_DEVELOPER = "nexus.datastore.developer";
