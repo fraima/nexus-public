@@ -28,3 +28,4 @@ variables.properties
 
 *.class
 **/bin/*
+.vscode/settings.json
