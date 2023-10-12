@@ -36,6 +36,7 @@ import org.sonatype.nexus.repository.cache.RepositoryCacheInvalidationService;
 import org.sonatype.nexus.repository.config.Configuration;
 import org.sonatype.nexus.repository.config.ConfigurationFacet;
 import org.sonatype.nexus.repository.manager.RepositoryManager;
+import org.sonatype.nexus.repository.security.RepositoryPermissionChecker;
 import org.sonatype.nexus.repository.types.GroupType;
 import org.sonatype.nexus.repository.view.Content;
 import org.sonatype.nexus.validation.ConstraintViolationFactory;
@@ -86,6 +87,13 @@ public class GroupFacetImpl
   private Config config;
 
   protected CacheController cacheController;
+
+  @Inject
+  private RepositoryPermissionChecker repositoryPermissionChecker;
+
+  @Inject
+  @Named("${nexus.group.nontransitive.privileges.enabled:-false}")
+  private boolean groupPermissionEnabled;
 
   @Inject
   public GroupFacetImpl(final RepositoryManager repositoryManager,
@@ -194,6 +202,9 @@ public class GroupFacetImpl
         members.add(member);
       }
     }
+    if (groupPermissionEnabled) {
+      return repositoryPermissionChecker.userCanBrowseRepositories(members);
+    }
     return members;
   }
 
@@ -224,7 +235,7 @@ public class GroupFacetImpl
         .orElseGet(Collections::emptyList);
     for (Repository child : groupMembers) {
         allMembers(members, child);
-      }
+    }
     return members;
   }
 
