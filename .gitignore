@@ -25,3 +25,6 @@ out
 # Zion
 .zion/
 variables.properties
+
+*.class
+**/bin/*
