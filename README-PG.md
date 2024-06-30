@@ -15,10 +15,18 @@ mkdir -p /tmp/sonatype-work/nexus3/etc/
 mkdir -p /tmp/nexus-data
 chmod 777 /tmp/nexus-data
 
-export PG_URL="localhost:5432"
+export PG_URL="10.10.0.11:5432"
 export PG_USER="nexus"
 export PG_PASSWORD="nexus"
 export PG_DB="nexus"
+
+docker run --name some-postgres \
+--rm \
+--network host \
+-e POSTGRES_PASSWORD=${PG_PASSWORD} \
+-e POSTGRES_USER=${PG_USER} \
+-e POSTGRES_DB=${PG_DB} \
+-d postgres 
 
 cat <<EOF > /tmp/sonatype-work/nexus3/etc/nexus.properties
 nexus.datastore.enabled=true
@@ -26,14 +34,16 @@ nexus.datastore.nexus.jdbcUrl=jdbc:postgresql://$PG_URL/$PG_DB?user=$PG_USER&pas
 nexus.datastore.nexus.genericJdbc=true
 EOF
 
-docker build -t fraima.io/nexus:3.60.0-02 . 
-docker run -d -ti     \
-    --rm \
+docker build -t sgroups/nexus-public:release-3.65.0-02.fr-cac8330b .
+
+docker run -d -ti \
+    --privileged \
+    -u 0 \
     -p 8080:8081 \
-    -p 9090:9090 \
     -v /tmp/sonatype-work/nexus3/etc/nexus.properties:/opt/sonatype/sonatype-work/nexus3/etc/nexus.properties \
     -v /tmp/nexus-data:/nexus-data \
-    fraima.io/nexus:3.60.0-02
+    sgroups/nexus-public:release-3.58.1-02.fr-1b28fb54
+
 
 ```
 
