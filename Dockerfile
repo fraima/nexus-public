@@ -10,13 +10,13 @@ RUN mkdir -p /build/ && \
     cp components/nexus-common/target/nexus-common-*.jar /build/
 
 
-FROM sonatype/nexus3:3.69.0 as src-plugin
+FROM sonatype/nexus3:3.68.0 as src-plugin
 
 USER nexus
 WORKDIR /opt/sonatype/nexus
 
-COPY --from=builder --chown=nexus:nexus /build/nexus-datastore-*.jar system/org/sonatype/nexus/nexus-datastore/3.69.0-02/
-COPY --from=builder --chown=nexus:nexus /build/nexus-common-*.jar system/org/sonatype/nexus/nexus-common/3.69.0-02/
+COPY --from=builder --chown=nexus:nexus /build/nexus-datastore-*.jar system/org/sonatype/nexus/nexus-datastore/3.68.0-02/
+COPY --from=builder --chown=nexus:nexus /build/nexus-common-*.jar system/org/sonatype/nexus/nexus-common/3.68.0-02/
 
 
 CMD ["/opt/sonatype/nexus/bin/nexus", "run"]
