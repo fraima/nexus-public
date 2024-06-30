@@ -1,0 +1,416 @@
+From f5d156cbb4fe8e7188856eb825d9ff7a4511cb60 Mon Sep 17 00:00:00 2001
+From: Dmitrii Putilin <dlputilin@dobry-kot.ru>
+Date: Mon, 1 Jul 2024 00:27:19 +0300
+Subject: [PATCH] =?UTF-8?q?=D0=94=D0=BE=D0=B1=D0=B0=D0=B2=D0=BB=D1=8F?=
+ =?UTF-8?q?=D0=B5=D1=82=20=D0=9F=D0=B0=D1=82=D1=87?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Dobry-kot <dlputilin@dobry-kot.ru>
+Signed-off-by: eXqxqxq <stepan.alexandrov@r1.team>
+---
+ .dockerignore                                 |  5 ++
+ .github/workflows/docker-build.yaml           | 36 ++++++++
+ .github/workflows/release.yaml                | 44 ++++++++++
+ .gitignore                                    |  5 +-
+ Dockerfile                                    | 22 +++++
+ README-PG.md                                  | 88 +++++++++++++++++++
+ build-in-docker.sh                            |  6 ++
+ .../nexus/common/app/FeatureFlags.java        |  2 +
+ ...taStoreConfigurationGenericJdbcSource.java | 76 ++++++++++++++++
+ components/nexus-rapture/package.json         |  2 +-
+ plugins/nexus-coreui-plugin/package.json      |  2 +-
+ 11 files changed, 284 insertions(+), 4 deletions(-)
+ create mode 100644 .dockerignore
+ create mode 100644 .github/workflows/docker-build.yaml
+ create mode 100644 .github/workflows/release.yaml
+ create mode 100644 Dockerfile
+ create mode 100644 README-PG.md
+ create mode 100644 build-in-docker.sh
+ create mode 100644 components/nexus-datastore/src/main/java/org/sonatype/nexus/datastore/DataStoreConfigurationGenericJdbcSource.java
+
+diff --git a/.dockerignore b/.dockerignore
+new file mode 100644
+index 0000000000..e1c5d2d159
+--- /dev/null
++++ b/.dockerignore
+@@ -0,0 +1,5 @@
++node_modules/
++.idea
++Dockerfile
++nexus-parent.iml
++.yarn/cache
+\ No newline at end of file
+diff --git a/.github/workflows/docker-build.yaml b/.github/workflows/docker-build.yaml
+new file mode 100644
+index 0000000000..dd3b9b63dd
+--- /dev/null
++++ b/.github/workflows/docker-build.yaml
+@@ -0,0 +1,36 @@
++name: release
++on:
++  push:
++    branches:
++      - '*'
++    tags:
++      - '*'
++
++jobs:
++  build:
++    runs-on: ubuntu-latest
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v4
++
++      - uses: benjlevesque/short-sha@v3.0
++        id: short-sha
++        with:
++          length: 8
++
++      - name: Login to Docker Hub
++        uses: docker/login-action@v3
++        with:
++          username: ${{ secrets.DOCKERHUB_USERNAME }}
++          password: ${{ secrets.DOCKERHUB_TOKEN }}
++      
++      - name: Set up Docker Buildx
++        uses: docker/setup-buildx-action@v3
++      
++      - name: Build and push nexus-public
++        uses: docker/build-push-action@v5
++        with:
++          context: .
++          file: ./Dockerfile
++          push: true
++          tags: ${{ secrets.DOCKERHUB_USERNAME }}/nexus-public:${{ github.head_ref || github.ref_name }}-${{ steps.short-sha.outputs.sha }} 
+diff --git a/.github/workflows/release.yaml b/.github/workflows/release.yaml
+new file mode 100644
+index 0000000000..16e123849f
+--- /dev/null
++++ b/.github/workflows/release.yaml
+@@ -0,0 +1,44 @@
++name: release
++on:
++  push:
++    tags:
++      - "*"
++
++jobs:
++  publish:
++    name: release
++    runs-on: ubuntu-20.04
++    permissions:
++      contents: write
++    steps:
++      - uses: actions/checkout@v4
++      - name: Set up JDK 8 for x64
++        uses: actions/setup-java@v3
++        with:
++          java-version: '8'
++          distribution: 'temurin'
++          architecture: x64
++
++      - uses: actions/checkout@v2
++        with:
++          fetch-depth: 0
++          path: src/github.com/fraima/nexus-public
++
++      - name: Run the Maven verify phase
++        run: |
++          pwd \
++          ls -al \
++
++
++        working-directory: src/github.com/fraima/nexus-public
++
++      - uses: ncipollo/release-action@v1
++        with:
++          allowUpdates: true
++          artifacts: src/github.com/fraima/nexus-public/_output/releases/*
++          bodyFile: src/github.com/fraima/nexus-public/release-notes.md
++
++      - uses: actions/upload-artifact@v2
++        with:
++          name: build-artifacts
++          path: src/github.com/fraima/nexus-public/_output
+diff --git a/.gitignore b/.gitignore
+index 9c4e3db3e4..3aebacf558 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -2,7 +2,7 @@
+ .classpath
+ .project
+ .settings/
+-
++node_modules
+ # Maven
+ target/
+ *.ser
+@@ -24,4 +24,5 @@ out
+ 
+ # Zion
+ .zion/
+-variables.properties
+\ No newline at end of file
++variables.properties
++node_modules
+diff --git a/Dockerfile b/Dockerfile
+new file mode 100644
+index 0000000000..c92878a7a4
+--- /dev/null
++++ b/Dockerfile
+@@ -0,0 +1,22 @@
++#ENV TEST_alexgluck=test
++FROM alpine as builder
++WORKDIR /app
++RUN apk add openjdk8
++RUN apk add git
++COPY . .
++RUN ./mvnw -pl components/nexus-common,components/nexus-datastore -am clean install -DskipTests=true -P skipNpmTests-maven.test.skip,skipNpmTests-skipTests
++RUN mkdir -p /build/ && \
++    cp components/nexus-datastore/target/nexus-datastore-*.jar /build/ && \
++    cp components/nexus-common/target/nexus-common-*.jar /build/
++
++
++FROM sonatype/nexus3:3.69.0 as src-plugin
++
++USER nexus
++WORKDIR /opt/sonatype/nexus
++
++COPY --from=builder --chown=nexus:nexus /build/nexus-datastore-*.jar system/org/sonatype/nexus/nexus-datastore/3.69.0-02/
++COPY --from=builder --chown=nexus:nexus /build/nexus-common-*.jar system/org/sonatype/nexus/nexus-common/3.69.0-02/
++
++
++CMD ["/opt/sonatype/nexus/bin/nexus", "run"]
+diff --git a/README-PG.md b/README-PG.md
+new file mode 100644
+index 0000000000..65c9f3e79d
+--- /dev/null
++++ b/README-PG.md
+@@ -0,0 +1,88 @@
++## Сборка 
++jdk==1.8
++
++```shell
++./mvnw clean install -DskipTests=true -P skipNpmTests-maven.test.skip,skipNpmTests-skipTests
++```
++
++Зип упадет в `assemblies/nexus-base-template/target/`
++
++## Настройки 
++
++
++```bash
++mkdir -p /tmp/sonatype-work/nexus3/etc/
++mkdir -p /tmp/nexus-data
++chmod 777 /tmp/nexus-data
++
++export PG_URL="localhost:5432"
++export PG_USER="nexus"
++export PG_PASSWORD="nexus"
++export PG_DB="nexus"
++
++docker run --name some-postgres \
++--rm \
++--network host \
++-e POSTGRES_PASSWORD=${PG_PASSWORD} \
++-e POSTGRES_USER=${PG_USER} \
++-e POSTGRES_DB=${PG_DB} \
++-d postgres
++
++cat <<EOF > /tmp/sonatype-work/nexus3/etc/nexus.properties
++nexus.datastore.enabled=true
++nexus.datastore.nexus.jdbcUrl=jdbc:postgresql://$PG_URL/$PG_DB?user=$PG_USER&password=$PG_PASSWORD
++nexus.datastore.nexus.genericJdbc=true
++EOF
++
++docker build -t myregistry/nexus-public:$(git rev-parse --abbrev-ref HEAD) . 
++
++# ВНИМАНИЕ: На некоторых версиях Docker файл монтируется как директория
++docker run -ti     \
++    --network host \
++    --mount type=bind,source=/tmp/sonatype-work/nexus3/etc/nexus.properties,target=/opt/sonatype/sonatype-work/nexus3/etc/nexus.properties \
++    -u 0 \
++    -p 8080:8081 \
++    -p 9090:9090 \
++    myregistry/nexus-public:$(git rev-parse --abbrev-ref HEAD)
++
++```
++
++`<workdir>/sonatype-work/nexus3/etc/nexus.properties`:
++```properties
++nexus.datastore.enabled=true
++nexus.datastore.nexus.jdbcUrl=jdbc:postgresql://<host>:<port>/<db>?user=<user>&password=<pass>
++nexus.datastore.nexus.genericJdbc=true
++```
++
++## Запуск 
++распаковать zip в <workdir>
++jdk == 1.8
++
++```shell
++./nexus-base-template-<X.XX.X>/bin/nexus.run
++```
++
++# Миграции
++
++https://help.sonatype.com/repomanager3/installation-and-upgrades/migrating-to-a-new-database
++
++## Миграция из H2 в PG:
++
++```shell
++java -Xmx4G -Xms4G -XX:MaxDirectMemorySize=4014M -jar nexus-db-migrator-*.jar --migration_type=h2_to_postgres --db_url="jdbc:postgresql://<database URL>:<port>/nexus?user=postgresUser&password=secretPassword&currentSchema=nexus"
++```
++
++## из PG в H2
++
++```shell
++java -jar nexus-db-migrator-*.jar --migration_type=postgres_to_h2 --db_url="jdbc:postgresql://<database URL>:<port>/nexus?user=postgresUser&password=secretPassword&currentSchema=nexus"
++```
++
++nexus-db-migrator не поддерживает прямую миграцию PG->PG 
++для реализации такого сценария сначала нужно выполнить миграцию PG->H2 затем H2->PG
++
++
++https://github.com/sonatype/docker-nexus/issues/9
++
++export NEXUS_VERSION=3.60.0-02
++https://repo1.maven.org/maven2/org/sonatype/nexus/plugins/nexus-p2-bridge-plugin/${NEXUS_VERSION}/nexus-p2-bridge-plugin-${NEXUS_VERSION}-bundle.zip
+\ No newline at end of file
+diff --git a/build-in-docker.sh b/build-in-docker.sh
+new file mode 100644
+index 0000000000..743a3bfd89
+--- /dev/null
++++ b/build-in-docker.sh
+@@ -0,0 +1,6 @@
++#!/bin/bash
++if [ ! -d "target" ]; then
++  mkdir "target"
++fi
++docker build -t nexus-builder .
++docker run -v "$(pwd):/app/buildDir" nexus-builder
+diff --git a/components/nexus-common/src/main/java/org/sonatype/nexus/common/app/FeatureFlags.java b/components/nexus-common/src/main/java/org/sonatype/nexus/common/app/FeatureFlags.java
+index 0d22a97dd9..64f15728bd 100644
+--- a/components/nexus-common/src/main/java/org/sonatype/nexus/common/app/FeatureFlags.java
++++ b/components/nexus-common/src/main/java/org/sonatype/nexus/common/app/FeatureFlags.java
+@@ -29,6 +29,8 @@ public interface FeatureFlags
+   /* Database externalization. Available values: true, false. Default value: false */
+   String DATASTORE_ENABLED = "nexus.datastore.enabled";
+   String DATASTORE_ENABLED_NAMED = "${nexus.datastore.enabled:-false}";
++  String DATASTORE_GENERIC_JDBC_ENABLED_NAMED = "${nexus.datastore.nexus.genericJdbc:-false}";
++
+ 
+   /* Database externalization developers only. Available values: true, false. Default value: false */
+   String DATASTORE_DEVELOPER = "nexus.datastore.developer";
+diff --git a/components/nexus-datastore/src/main/java/org/sonatype/nexus/datastore/DataStoreConfigurationGenericJdbcSource.java b/components/nexus-datastore/src/main/java/org/sonatype/nexus/datastore/DataStoreConfigurationGenericJdbcSource.java
+new file mode 100644
+index 0000000000..0c7b3ae19a
+--- /dev/null
++++ b/components/nexus-datastore/src/main/java/org/sonatype/nexus/datastore/DataStoreConfigurationGenericJdbcSource.java
+@@ -0,0 +1,76 @@
++package org.sonatype.nexus.datastore;
++
++import javax.annotation.Priority;
++import javax.inject.Inject;
++import javax.inject.Named;
++import javax.inject.Singleton;
++
++import com.google.common.collect.ImmutableMap;
++import com.google.common.collect.ImmutableSet;
++import org.sonatype.goodies.common.ComponentSupport;
++import org.sonatype.nexus.datastore.api.DataStoreConfiguration;
++
++import static com.google.common.base.Preconditions.checkArgument;
++import static java.lang.Integer.MIN_VALUE;
++import static org.sonatype.nexus.common.app.FeatureFlags.DATASTORE_GENERIC_JDBC_ENABLED_NAMED;
++import static org.sonatype.nexus.datastore.api.DataStoreManager.DEFAULT_DATASTORE_NAME;
++
++
++@Named(DataStoreConfigurationGenericJdbcSource.GENERIC_JDBC)
++@Priority(MIN_VALUE + 10)
++@Singleton
++public class DataStoreConfigurationGenericJdbcSource
++    extends ComponentSupport
++    implements DataStoreConfigurationSource {
++
++    static final String GENERIC_JDBC = "nexus";
++
++    private static final String JDBC_TEMPLATE_URL = "${nexus.datastore.nexus.jdbcUrl}";
++
++    private static final String JDBC = "jdbc";
++
++    private static final String JDBC_URL = "jdbcUrl";
++
++    private final boolean enabled;
++
++    @Inject
++    public DataStoreConfigurationGenericJdbcSource(@Named(DATASTORE_GENERIC_JDBC_ENABLED_NAMED) boolean enabled) {
++        this.enabled = enabled || JDBC_TEMPLATE_URL.toLowerCase().contains("postgres");
++    }
++
++    @Override
++    public String getName() {
++        return GENERIC_JDBC;
++    }
++
++    @Override
++    public boolean isModifiable() {
++        return true;
++    }
++
++    @Override
++    public Iterable<String> browseStoreNames() {
++        return ImmutableSet.<String>builder().add(DEFAULT_DATASTORE_NAME).build();
++    }
++
++    @Override
++    public boolean isEnabled() {
++        return this.enabled;
++    }
++
++    @Override
++    public DataStoreConfiguration load(final String storeName) {
++        checkArgument(DEFAULT_DATASTORE_NAME.equalsIgnoreCase(storeName),
++            "%s is not valid, %s is the only valid data store name", storeName, DEFAULT_DATASTORE_NAME);
++        DataStoreConfiguration configuration = new DataStoreConfiguration();
++        configuration.setName(DEFAULT_DATASTORE_NAME);
++        configuration.setType(JDBC);
++        configuration.setSource(GENERIC_JDBC);
++        configuration.setAttributes(ImmutableMap.of(JDBC_URL, JDBC_TEMPLATE_URL));
++
++        log.info("Loaded '{}' data store configuration (GENERIC_JDBC)", storeName);
++
++        return configuration;
++    }
++
++}
+diff --git a/components/nexus-rapture/package.json b/components/nexus-rapture/package.json
+index 214e2366ff..aba7833c1e 100644
+--- a/components/nexus-rapture/package.json
++++ b/components/nexus-rapture/package.json
+@@ -14,7 +14,7 @@
+     "@fortawesome/fontawesome-svg-core": "1.2.25",
+     "@fortawesome/free-solid-svg-icons": "5.11.2",
+     "@fortawesome/react-fontawesome": "0.1.4",
+-    "@sonatype/nexus-ui-plugin": "workspace:*",
++    "@sonatype/nexus-ui-plugin": "file:../nexus-ui-plugin",
+     "@sonatype/react-shared-components": "13.1.6",
+     "@xstate/inspect": "0.4.1",
+     "axios": "0.27.2",
+diff --git a/plugins/nexus-coreui-plugin/package.json b/plugins/nexus-coreui-plugin/package.json
+index a47a3f9fe6..6e65e7d825 100644
+--- a/plugins/nexus-coreui-plugin/package.json
++++ b/plugins/nexus-coreui-plugin/package.json
+@@ -38,7 +38,7 @@
+     "@babel/plugin-transform-runtime": "7.17.0",
+     "@babel/preset-env": "7.16.11",
+     "@babel/preset-react": "7.16.7",
+-    "@sonatype/nexus-ui-plugin": "workspace:*",
++    "@sonatype/nexus-ui-plugin": "file:../../components/nexus-ui-plugin",
+     "@testing-library/jest-dom": "5.14.1",
+     "@testing-library/react": "12.1.2",
+     "@testing-library/user-event": "12.8.3",
+-- 
+2.43.0
+
