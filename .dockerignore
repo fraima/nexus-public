@@ -1,0 +1,5 @@
+node_modules/
+.idea
+Dockerfile
+nexus-parent.iml
+.yarn/cache

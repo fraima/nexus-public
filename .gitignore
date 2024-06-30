@@ -2,7 +2,7 @@
 .classpath
 .project
 .settings/
-
+node_modules
 # Maven
 target/
 *.ser
@@ -25,3 +25,4 @@ out
 # Zion
 .zion/
 variables.properties
+node_modules
